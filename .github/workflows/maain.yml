@@ -1,4 +1,4 @@
-name: VPS OptiOS 8.1 Gamer (14GB RAM)
+name: VPS OptiOS 8.1 Corregido
 
 on:
   workflow_dispatch:
@@ -6,19 +6,20 @@ on:
 jobs:
   windows-opti:
     runs-on: ubuntu-latest
-    timeout-minutes: 360 # 6 Horas exactas
+    timeout-minutes: 360
     
     steps:
-      - name: "1. Preparar KVM (Acelerador)"
+      - name: "1. Preparar KVM"
         run: |
-          sudo apt-get update -y
+          sudo apt-get update
           sudo chown $USER /dev/kvm
-          echo "KVM activado para que Windows 8.1 vuele."
-
-      - name: "2. Desplegar OptiOS 8.1"
+          
+      - name: "2. Descargar y Desplegar Windows"
         run: |
-          # Usamos tu link directo de la ISO
-          # VERSION: "win81" ayuda al contenedor a saber qué drivers preparar
+          # Intentamos forzar la descarga de la imagen primero
+          docker pull dockur/windows:latest
+          
+          # Ejecutamos con el nombre corregido
           docker run -d \
             --name=windows \
             --device=/dev/kvm \
@@ -26,23 +27,14 @@ jobs:
             -p 8006:8006 \
             -e RAM_SIZE="14G" \
             -e CPU_CORES="4" \
-            -e DISK_SIZE="64G" \
-            -e VERSION="win81" \
+            -e VERSION="8.1" \
             -e CUSTOM_ISO="https://www.mediafire.com/file/fbgdr9993u39ik6?dkey=bx8h6qzqtzq&r=1551" \
             dockur/windows
             
-          echo "Descargando OptiOS e iniciando..."
-          echo "Esto tardará unos 3-5 minutos en arrancar la instalación."
-          sleep 30
+          echo "Esperando a que el contenedor inicie..."
+          sleep 20
 
-      - name: "3. Crear Túnel Web (Acceso)"
+      - name: "3. Crear Túnel de Acceso"
         run: |
-          echo "---------------------------------------------------------"
-          echo " TU WINDOWS GAMER ESTÁ INICIANDO"
-          echo " 1. Espera el link de 'trycloudflare' abajo."
-          echo " 2. Al entrar, verás la instalación de Windows."
-          echo " 3. NOTA IMPORTANTE: Si no ves el disco duro al instalar,"
-          echo "    busca la opción 'Cargar Controlador' -> CD VirtIO -> amd64 -> w8.1"
-          echo "---------------------------------------------------------"
-          
+          # Usamos una imagen alternativa de Cloudflare por si acaso
           docker run --rm --net=host cloudflare/cloudflared:latest tunnel --url http://localhost:8006
