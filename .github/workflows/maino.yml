@@ -3,7 +3,7 @@ name: VPS NoMachine 100% DIRECTO
 on:
   workflow_dispatch:
 
-jobs
+jobs:
   windows-nomachine-session:
     runs-on: ubuntu-latest
     timeout-minutes: 360 # 6 Horas
