@@ -1,0 +1,50 @@
+name: VPS Android Web - Cloudflare (6 Horas)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  android-session:
+    runs-on: ubuntu-latest
+    # Tiempo límite estricto de GitHub: 6 horas (360 min)
+    timeout-minutes: 360
+    
+    steps:
+      - name: "1. Preparar Entorno y Habilitar Aceleración KVM"
+        run: |
+          # Habilitamos KVM en la máquina de GitHub para que Android corra fluido
+          sudo apt-get update
+          sudo apt-get install -y cpu-checker
+          kvm-ok || echo "Continuando configuración de KVM..."
+          # Damos permisos a Docker para acceder a la virtualización de hardware
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: "2. Desplegar Android (Android 11 - Accesible por Web)"
+        run: |
+          # Iniciamos el entorno Android en segundo plano (-d)
+          # Usamos el puerto 6080 que es donde expone la interfaz web
+          docker run -d \
+            --name=android-webtop \
+            --privileged \
+            --device /dev/kvm \
+            -e EMULATOR_DEVICE="Samsung Galaxy S10" \
+            -e WEB_VNC=true \
+            -p 6080:6080 \
+            budtmo/docker-android:emulator_11.0
+            
+          echo "Android arrancando... Esperando que el sistema operativo inicialice (esto tomará ~1 minuto)..."
+          sleep 60
+
+      - name: "3. Crear Túnel Cloudflare (Mantener Vivo)"
+        run: |
+          echo "---------------------------------------------------------"
+          echo " INSTRUCCIONES:"
+          echo " 1. Espera a que carguen los logs abajo."
+          echo " 2. Busca la URL que termina en 'trycloudflare.com'."
+          echo " 3. Entra a esa URL para ver y controlar tu Android."
+          echo "---------------------------------------------------------"
+          
+          # Ejecutamos Cloudflare Tunnel apuntando al puerto 6080 local (el del Android Web)
+          docker run --rm --net=host cloudflare/cloudflared:latest tunnel --url http://localhost:6080
