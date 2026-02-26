@@ -1,0 +1,77 @@
+name: VPS Webtop + Android KVM (6 Horas)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  vps-session:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    
+    steps:
+      - name: "1. Preparar Entorno y Aceleración KVM"
+        run: |
+          # Habilitamos KVM en el servidor para que Android vuele
+          sudo apt-get update
+          sudo apt-get install -y cpu-checker
+          kvm-ok || echo "Forzando KVM..."
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: "2. Desplegar Webtop (Máxima Velocidad KasmVNC)"
+        run: |
+          # Iniciamos Webtop dándole PRIVILEGIOS y acceso a KVM
+          docker run -d \
+            --name=webtop \
+            --privileged \
+            --device /dev/kvm \
+            --security-opt seccomp=unconfined \
+            -e PUID=1000 -e PGID=1000 \
+            -e TZ=America/Caracas \
+            -p 3000:3000 \
+            --memory="14g" \
+            --shm-size="4gb" \
+            lscr.io/linuxserver/webtop:ubuntu-xfce
+            
+          echo "Webtop arrancando... esperando 15 segundos..."
+          sleep 15
+
+      - name: "3. Instalar QEMU y Preparar Escritorio"
+        run: |
+          # Instalamos el motor de máquinas virtuales dentro de Webtop
+          docker exec webtop bash -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y qemu-system-x86 qemu-kvm wget"
+          
+          # Creamos carpeta en el escritorio y descargamos la ISO de Android
+          docker exec webtop bash -c "mkdir -p /config/Desktop/Android"
+          echo "Descargando ISO Estable de Android x86..."
+          docker exec webtop bash -c "wget -qO /config/Desktop/Android/Android.iso 'https://sourceforge.net/projects/android-x86/files/Release%209.0/android-x86_64-9.0-r2.iso/download'"
+          
+          # Creamos un acceso directo mágico en el escritorio para iniciar Android
+          docker exec webtop bash -c "cat << 'EOF' > /config/Desktop/Iniciar_Android.desktop
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=Iniciar Android
+          Comment=Ejecutar Android
+          Exec=qemu-system-x86_64 -enable-kvm -m 6144 -smp 4 -cdrom /config/Desktop/Android/Android.iso -vga virtio -net nic -net user -boot d
+          Icon=system-run
+          Terminal=true
+          Categories=System;
+          EOF"
+          
+          # Damos permisos
+          docker exec webtop bash -c "chmod +x /config/Desktop/Iniciar_Android.desktop"
+          docker exec webtop bash -c "chown -R 1000:1000 /config/Desktop/"
+
+      - name: "4. Crear Túnel Cloudflare"
+        run: |
+          echo "---------------------------------------------------------"
+          echo " INSTRUCCIONES:"
+          echo " 1. Entra a tu URL de trycloudflare.com abajo."
+          echo " 2. Verás tu escritorio Webtop súper rápido."
+          echo " 3. En el escritorio verás un ícono: 'Iniciar Android'."
+          echo " 4. Dale doble clic y Android se abrirá en una ventana."
+          echo "---------------------------------------------------------"
+          
+          docker run --rm --net=host cloudflare/cloudflared:latest tunnel --url http://localhost:3000
