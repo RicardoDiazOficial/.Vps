@@ -1,0 +1,35 @@
+name: 1. EXTRAER CLAVE SECRETA
+on: workflow_dispatch
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instalar y Ejecutar
+        run: |
+          curl -Lo playit https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-linux-amd64
+          chmod +x playit
+          
+          # 1. Iniciamos el proceso de reclamo
+          ./playit setup --secret-only & 
+          
+          echo "---------------------------------------------------------"
+          echo "ESPERA 5 SEGUNDOS Y BUSCA EL LINK ABAJO"
+          echo "---------------------------------------------------------"
+          sleep 10
+          
+          # 2. Mostramos el link de reclamo
+          echo "Paso A: Clica este link y logueate en Playit:"
+          # Intentamos sacar el link del log
+          ./playit setup 2>&1 | grep -o 'https://playit.gg/claim/[^ ]*' || echo "No se vio el link, reintenta."
+          
+          echo "---------------------------------------------------------"
+          echo "Paso B: Tienes 60 segundos para aceptar el link en la web."
+          echo "---------------------------------------------------------"
+          sleep 60
+          
+          # 3. AQUÍ ESTÁ LO QUE BUSCAS: Extraer la clave del archivo generado
+          echo "TU SECRET KEY ES UNA DE ESTAS (COPIA LA LARGA):"
+          echo "---------------------------------------------------------"
+          cat ~/.config/playit/playit.toml 2>/dev/null | grep 'secret_key' || true
+          cat playit.toml 2>/dev/null | grep 'secret_key' || true
+          echo "---------------------------------------------------------"
